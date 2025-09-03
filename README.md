@@ -1,7 +1,5 @@
 # GameMemVRAM-Tuner
 
-# GameMemVRAM-Tuner
-
 **GameMemVRAM-Tuner** is a set of PowerShell scripts that push Windows into a **RAM-first / VRAM-first mode** and offload junk writes onto a **volatile RAM disk**, giving smoother gaming, reduced stutter, and longer SSD life.  
 
 - 🎮 **GameMemVRAM-Tuner.ps1** — auto-detects system RAM & dGPU VRAM, sets VRAM budgeting hints, enables **HAGS**, disables **MPO/Xbox DVR**, tunes pagefile & cache, and favors RAM over paging.  
