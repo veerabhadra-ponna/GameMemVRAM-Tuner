@@ -1,95 +1,92 @@
 # GameMemVRAM-Tuner
 
-**GameMemVRAM-Tuner** is a set of PowerShell scripts that push Windows into a **RAM-first / VRAM-first mode** and offload junk writes onto a **volatile RAM disk**, giving smoother gaming, reduced stutter, and longer SSD life.  
+GameMemVRAM-Tuner is a single PowerShell script that tunes Windows 10/11 into a RAM-first / VRAM-first configuration to reduce paging and smooth out gameplay. It auto-detects RAM and dGPU VRAM, applies reversible OS tweaks, and provides Apply / Revert / Report modes with color output.
 
-- 🎮 **GameMemVRAM-Tuner.ps1** — auto-detects system RAM & dGPU VRAM, sets VRAM budgeting hints, enables **HAGS**, disables **MPO/Xbox DVR**, tunes pagefile & cache, and favors RAM over paging.  
-- 🖴 **Setup-VolatileIO.ps1** — creates a **4 GB RAM disk (T:)** at boot, redirects TEMP/TMP, Downloads, and browser caches into RAM, with optional **ephemeral browser profiles** for fully volatile sessions.  
-- 🔁 Both scripts support **Apply / Revert / Report** modes with verbose, colorized output and safe state tracking so changes can be rolled back cleanly.  
+Note: Games and engines ultimately control RAM/VRAM use. This script removes common OS bottlenecks and encourages VRAM/RAM usage; it cannot override game-enforced limits.
 
-> ⚠️ **Note:** Games ultimately decide how much VRAM/RAM they use. These scripts remove Windows bottlenecks and encourage VRAM/RAM use, but some engines enforce their own limits.
+---
 
-🔁 Both scripts support Apply / Revert / Report modes with verbose, colorized output and safe state tracking.
+## What It Does
 
-Two practical Windows scripts to make games lean on **VRAM/RAM** and cut **SSD I/O**:
-
-1) `GameMemVRAM-Tuner.ps1` — tunes Windows to be RAM-first and VRAM-first:
-   - Auto-detects RAM & dGPU **VRAM** (skips Intel iGPU)
-   - Sets VRAM budgeting hint per dGPU (`DedicatedSegmentSize`)
-   - Enables **HAGS**, disables **MPO**, disables **Xbox DVR**
-   - Expands I/O page lock limit based on RAM, increases NTFS cache
-   - Pins a small, fixed **pagefile (1–2 GB)** to prevent boot warnings
-   - Optional low-latency TCP tweaks
-   - `-Apply`, `-Revert`, `-Report` modes with colorized, verbose output
-
-2) `Setup-VolatileIO.ps1` — offloads “junk writes” to a **non-persistent RAM disk**:
-   - Creates **T:** (4 GB, NTFS) via **ImDisk**, recreates at **boot** (Scheduled Task)
-   - Redirects **TEMP/TMP** (system + user) → `T:\Temp`
-   - Moves **Downloads** (user known folder) → `T:\Download`
-   - Redirects major **browser caches** (Chrome/Edge/Brave/Opera/Firefox) → `T:\cache`
-   - Optional **Ephemeral** browser shortcuts (entire profile on T:) for fully volatile sessions
-   - `-Apply`, `-Revert`, `-CreateEphemeralBrowserShortcuts`
-
-> **Why this repo?**  
-> - Reduce stutter/spikes due to paging & metadata I/O  
-> - Push textures/shaders to VRAM (when game/engine allows it)  
-> - Dramatically cut random SSD writes from temp/caches  
-> - Keep it reversible and transparent
+- RAM/I-O: increases cache usage and raises I/O page lock limit based on total RAM.
+- GPU: enables HAGS and disables MPO; disables Xbox Game DVR and enforces Game Mode.
+- VRAM hint: sets `DedicatedSegmentSize` for NVIDIA/AMD dGPUs (skips Intel iGPU).
+- Pagefile: pins a small, fixed pagefile (1024–2048 MB) on the system drive.
+- Network (optional): applies low-latency TCP registry knobs, or skip with `-SkipNetwork`.
+- Modes: `-Apply`, `-Revert`, and `-Report` with clear, colored output.
 
 ---
 
 ## Requirements
 
-- Windows 10/11, **Administrator** rights
-- For `Setup-VolatileIO.ps1`: installs **ImDisk** (via winget → choco fallback)
-- At least one **NVIDIA/AMD** dGPU for VRAM hints (Intel iGPU is skipped on purpose)
+- Windows 10/11
+- PowerShell (run as Administrator)
+- NVIDIA or AMD dGPU recommended for VRAM hint (Intel iGPU is intentionally skipped)
+
+Optional detection helpers:
+- `nvidia-smi` on NVIDIA systems (the script falls back to registry, dxdiag, and WMI)
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-Clone or download this repo, open **PowerShell as Administrator**, and run from the `scripts/` folder.
+Run from the `scripts/` folder in an elevated PowerShell.
 
-### 1) RAM/VRAM tuning
 ```powershell
 cd .\scripts
-.\GameMemVRAM-Tuner.ps1 -Apply
-# Reboot when asked
-.\GameMemVRAM-Tuner.ps1 -Report
+.\GameMemVRAM-Tuner.ps1 -Apply       # Applies tweaks; prompts to reboot
+.\GameMemVRAM-Tuner.ps1 -Report      # Shows current state
+.\GameMemVRAM-Tuner.ps1 -Revert      # Restores defaults/common-safe values
 ```
 
-### 2) Volatile I/O (Temp/Downloads/Cache on RAM)
-```powershell
-# Run from repo root (Admin)
-cd .\scripts
-.\Setup-VolatileIO.ps1 -Apply
-# Sign out/in or reboot for Explorer to pick up Downloads path
-```
+Useful options:
+- `-SkipNetwork` to avoid applying TCP tweaks
+- `-ForceVramMB <int>` to override detected dGPU VRAM for the budgeting hint
 
-### Optional: Ephemeral browser profiles
-```powershell
-.\Setup-VolatileIO.ps1 -CreateEphemeralBrowserShortcuts
-# Launch via the new shortcuts (profiles + cache live on T:, wiped on reboot)
-```
+---
 
-### Safe revert
-```powershell
-# RAM/VRAM tweaks
-.\GameMemVRAM-Tuner.ps1 -Revert
+## Changes Applied (Apply)
 
-# Volatile I/O / RAM disk, caches, Downloads
-.\Setup-VolatileIO.ps1 -Revert
-```
+- Memory/I-O
+  - `DisablePagingExecutive=1`, `LargeSystemCache=1`
+  - `IoPageLockLimit` ≈ 2 MB per GB RAM (clamped 64–256 MB)
+  - `NtfsMemoryUsage=2`
+  - Prefetch: `EnablePrefetcher=1`, `EnableSuperfetch=0`
+- GPU/UI
+  - HAGS: `GraphicsDrivers\HwSchMode=2`
+  - MPO off: `Dwm\OverlayTestMode=5`
+- Game DVR / Game Mode (current user)
+  - Enables Game Mode and disables Xbox DVR keys under `GameConfigStore`
+- Network (unless `-SkipNetwork`)
+  - `TcpNoDelay=1`, `TcpAckFrequency=1`, `TcpDelAckTicks=0`
+- VRAM budgeting hint (dGPU only)
+  - Sets `DedicatedSegmentSize` (MB) on AMD/NVIDIA adapter registry nodes
+- Pagefile
+  - Disables auto-management, creates typed `Win32_PageFileSetting` for `pagefile.sys`
+  - InitialSize=1024, MaximumSize=2048 (with WMIC fallback)
+- Memory Compression
+  - Disables Memory Compression (MMAgent)
+
+Reboot is recommended after Apply to fully activate changes.
+
+---
+
+## Revert Behavior (Revert)
+
+- Restores Memory/I-O and Prefetch parameters to default/common-safe values
+- HAGS to `0`, MPO overlay test mode to `0`
+- Re-enables Game DVR defaults and keeps Game Mode allowed
+- Network: resets TCP keys to defaults (`TcpNoDelay=0`, etc.)
+- Removes `DedicatedSegmentSize` from all display adapter nodes
+- Restores automatic pagefile management and removes explicit pagefile settings
+- Re-enables Memory Compression
+
+---
 
 ## Disclaimer
 
-⚠️ **Important:** These scripts make registry and system-level changes, redirect
-folders to volatile storage, and may affect how Windows and your applications
-behave. By using them, you accept that:
+- Changes are system-level and at your own risk.
+- Always back up your system/registry before applying tweaks.
+- A revert path is provided, but not all system states are guaranteed recoverable.
 
-- All modifications are **at your own risk**.  
-- The authors and contributors are **not responsible** for data loss, corruption,
-  crashes, or any other damage.  
-- Always back up your registry, system, and data before applying.  
-- Revert scripts are provided, but not all states may be fully recoverable.
-
-If you are not comfortable with these risks, do **not** use this software.
+If you are not comfortable with these risks, do not use this software.
