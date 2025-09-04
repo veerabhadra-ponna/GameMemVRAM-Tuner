@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
