@@ -26,6 +26,8 @@ param(
   [switch]$Revert,
   [switch]$Report,
   [switch]$SkipNetwork,
+  [switch]$CreateRestorePoint,
+  [string]$RestorePointName,
   [ValidateRange(0,1048576)]
   [int]$ForceVramMB
 )
@@ -64,6 +66,23 @@ if ($ForceVramMB -gt 0) {
 function Write-OK($text) { Write-Host "  + $text" -ForegroundColor Green }
 
 # ----------------------- Helpers: Registry --------------------------#
+function New-GMVT-RestorePoint {
+  [CmdletBinding(SupportsShouldProcess=$true)]
+  param(
+    [Parameter(Mandatory)][string]$Description
+  )
+  try {
+    if ($PSCmdlet.ShouldProcess('System','Create restore point: ' + $Description)) {
+      Checkpoint-Computer -Description $Description -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop | Out-Null
+      Write-OK ("Restore point created: " + $Description)
+      return $true
+    }
+    return $false
+  } catch {
+    Write-Warn2 ("Could not create restore point: " + $_.Exception.Message)
+    return $false
+  }
+}
 function Ensure-RegKey {
   [CmdletBinding(SupportsShouldProcess=$true)]
   param([Parameter(Mandatory)][string]$Path)
@@ -324,7 +343,11 @@ $gpuList | ForEach-Object {
 function Apply-Tweaks {
   [CmdletBinding(SupportsShouldProcess=$true, ConfirmImpact='High')]
   param()
-
+  if ($CreateRestorePoint) {
+    $desc = if ($RestorePointName -and $RestorePointName.Trim()) { $RestorePointName.Trim() } else { 'GameMemVRAM-Tuner Apply' }
+    Write-Step ("Creating system restore point: " + $desc)
+    New-GMVT-RestorePoint -Description $desc | Out-Null
+  }
   # A) RAM-first + I/O reduction
   Write-Step "Applying RAM-first + I/O reduction"
   $mm = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"
@@ -477,6 +500,11 @@ function Apply-Tweaks {
 function Revert-Tweaks {
   [CmdletBinding(SupportsShouldProcess=$true, ConfirmImpact='High')]
   param()
+  if ($CreateRestorePoint) {
+    $desc = if ($RestorePointName -and $RestorePointName.Trim()) { $RestorePointName.Trim() } else { 'GameMemVRAM-Tuner Revert' }
+    Write-Step ("Creating system restore point: " + $desc)
+    New-GMVT-RestorePoint -Description $desc | Out-Null
+  }
   Write-Step "Reverting registry changes to defaults/common-safe values"
 
   $mm  = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"
@@ -585,6 +613,17 @@ function Report-State {
 
   $vals.GetEnumerator() | ForEach-Object { Write-Info (" - {0} : {1}" -f $_.Key,$_.Value) }
 
+  # GPUs summary (from earlier detection)
+  try {
+    if ($gpuList -and $gpuList.Count -gt 0) {
+      Write-Info " - GPUs (resolved VRAM):"
+      foreach ($g in $gpuList) {
+        $vramDisplay = if ($null -ne $g.VRAM_GB) { $g.VRAM_GB } else { 'n/a' }
+        Write-Info ("   * {0} [{1}] VRAM={2} GB" -f $g.Name, $g.Vendor, $vramDisplay)
+      }
+    }
+  } catch {}
+
   # Pagefile
   try {
     $cs4 = Get-CimInstance Win32_ComputerSystem
@@ -595,6 +634,13 @@ function Report-State {
         Write-Info (" - PagefileSetting : {0}  Init={1}  Max={2}" -f $p.Name,$p.InitialSize,$p.MaximumSize)
       }
     } else { Write-Info " - PagefileSetting : (none / auto)" }
+    # Usage details
+    $pfu = Get-CimInstance Win32_PageFileUsage -ErrorAction SilentlyContinue
+    if ($pfu) {
+      foreach ($u in $pfu) {
+        Write-Info (" - PagefileUsage : {0}  AllocBase={1}MB  Current={2}MB  Peak={3}MB" -f $u.Name,$u.AllocatedBaseSize,$u.CurrentUsage,$u.PeakUsage)
+      }
+    }
   } catch {}
 }
 
