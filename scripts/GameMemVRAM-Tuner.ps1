@@ -20,12 +20,13 @@
     .\GameMemVRAM-Tuner.ps1 -Apply -SkipNetwork
 ===================================================================== #>
 
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess=$true, ConfirmImpact='High')]
 param(
   [switch]$Apply,
   [switch]$Revert,
   [switch]$Report,
   [switch]$SkipNetwork,
+  [ValidateRange(0,1048576)]
   [int]$ForceVramMB
 )
 
@@ -46,43 +47,104 @@ function Coalesce($a,$b){ if($null -ne $a -and $a -ne ''){$a}else{$b} }
 
 Assert-Admin
 
+# Enforce mutually exclusive primary actions and surface overrides
+$__selectedActions = @()
+if ($Apply)  { $__selectedActions += 'Apply' }
+if ($Revert) { $__selectedActions += 'Revert' }
+if ($Report) { $__selectedActions += 'Report' }
+if ($__selectedActions.Count -gt 1) {
+  Write-Warn2 ("Multiple actions specified ({0}). Choose only one of -Apply, -Revert, or -Report." -f ($__selectedActions -join ', '))
+  exit 1
+}
+if ($ForceVramMB -gt 0) {
+  Write-Info ("Override: using ForceVramMB={0} for VRAM hint" -f $ForceVramMB)
+}
+
+# Override Write-OK to avoid non-ASCII glyph on some consoles
+function Write-OK($text) { Write-Host "  + $text" -ForegroundColor Green }
+
 # ----------------------- Helpers: Registry --------------------------#
-function Ensure-RegKey($Path){
+function Ensure-RegKey {
+  [CmdletBinding(SupportsShouldProcess=$true)]
+  param([Parameter(Mandatory)][string]$Path)
   if (-not (Test-Path $Path)) {
-    New-Item -Path $Path -ItemType Directory -Force | Out-Null
+    if ($PSCmdlet.ShouldProcess($Path, 'Create registry key')) {
+      New-Item -Path $Path -ItemType Directory -Force | Out-Null
+    }
   }
 }
-function Set-Dword($Path,$Name,$Value) {
+function Set-Dword {
+  [CmdletBinding(SupportsShouldProcess=$true)]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Name,
+    [Parameter(Mandatory)][uint32]$Value
+  )
   try {
-    Ensure-RegKey $Path
-    New-ItemProperty -Path $Path -Name $Name -PropertyType DWord -Value ([uint32]$Value) -Force | Out-Null
+    Ensure-RegKey -Path $Path
+    if ($PSCmdlet.ShouldProcess(($Path + ' -> ' + $Name), ("Set DWORD = {0}" -f $Value))) {
+      New-ItemProperty -Path $Path -Name $Name -PropertyType DWord -Value $Value -Force | Out-Null
+    }
     return $true
   } catch { Write-Warn2 "Failed to set $Path -> $Name : $($_.Exception.Message)"; return $false }
 }
-function Set-String($Path,$Name,$Value) {
+function Set-String {
+  [CmdletBinding(SupportsShouldProcess=$true)]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Name,
+    [Parameter(Mandatory)][string]$Value
+  )
   try {
-    Ensure-RegKey $Path
-    New-ItemProperty -Path $Path -Name $Name -PropertyType String -Value "$Value" -Force | Out-Null
+    Ensure-RegKey -Path $Path
+    if ($PSCmdlet.ShouldProcess(($Path + ' -> ' + $Name), ("Set STRING = {0}" -f $Value))) {
+      New-ItemProperty -Path $Path -Name $Name -PropertyType String -Value $Value -Force | Out-Null
+    }
     return $true
   } catch { Write-Warn2 "Failed to set $Path -> $Name : $($_.Exception.Message)"; return $false }
 }
-function Set-ExpandString($Path,$Name,$Value) {
+function Set-ExpandString {
+  [CmdletBinding(SupportsShouldProcess=$true)]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Name,
+    [Parameter(Mandatory)][string]$Value
+  )
   try {
-    Ensure-RegKey $Path
-    New-ItemProperty -Path $Path -Name $Name -PropertyType ExpandString -Value "$Value" -Force | Out-Null
+    Ensure-RegKey -Path $Path
+    if ($PSCmdlet.ShouldProcess(($Path + ' -> ' + $Name), ("Set EXPANDSZ = {0}" -f $Value))) {
+      New-ItemProperty -Path $Path -Name $Name -PropertyType ExpandString -Value $Value -Force | Out-Null
+    }
     return $true
   } catch { Write-Warn2 "Failed to set $Path -> $Name : $($_.Exception.Message)"; return $false }
 }
-function Set-MultiSZ($Path,$Name,[string[]]$Values) {
+function Set-MultiSZ {
+  [CmdletBinding(SupportsShouldProcess=$true)]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Name,
+    [Parameter(Mandatory)][string[]]$Values
+  )
   try {
-    Ensure-RegKey $Path
-    New-ItemProperty -Path $Path -Name $Name -PropertyType MultiString -Value $Values -Force | Out-Null
+    Ensure-RegKey -Path $Path
+    if ($PSCmdlet.ShouldProcess(($Path + ' -> ' + $Name), ("Set MULTISZ ({0} values)" -f $Values.Count))) {
+      New-ItemProperty -Path $Path -Name $Name -PropertyType MultiString -Value $Values -Force | Out-Null
+    }
     return $true
   } catch { Write-Warn2 "Failed to set $Path -> $Name : $($_.Exception.Message)"; return $false }
 }
-function Remove-Prop($Path,$Name) {
+function Remove-Prop {
+  [CmdletBinding(SupportsShouldProcess=$true)]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$Name
+  )
   try {
-    if (Test-Path $Path) { Remove-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue }
+    if (Test-Path $Path) {
+      if ($PSCmdlet.ShouldProcess(($Path + ' -> ' + $Name), 'Remove property')) {
+        Remove-ItemProperty -Path $Path -Name $Name -ErrorAction SilentlyContinue
+      }
+    }
   } catch { }
 }
 
@@ -260,6 +322,8 @@ $gpuList | ForEach-Object {
 
 # ----------------------- Actions: Apply ------------------------------#
 function Apply-Tweaks {
+  [CmdletBinding(SupportsShouldProcess=$true, ConfirmImpact='High')]
+  param()
 
   # A) RAM-first + I/O reduction
   Write-Step "Applying RAM-first + I/O reduction"
@@ -332,9 +396,9 @@ function Apply-Tweaks {
     } else {
       foreach ($n in $targetNodes) {
         try {
-          Ensure-RegKey $n.Path
+          Ensure-RegKey -Path $n.Path
           # DWORD in MB; e.g., 24 GB => 24576
-          New-ItemProperty -Path $n.Path -Name "DedicatedSegmentSize" -PropertyType DWord -Value ([uint32]$maxDgpuVramMB) -Force | Out-Null
+          Set-Dword -Path $n.Path -Name "DedicatedSegmentSize" -Value ([uint32]$maxDgpuVramMB) | Out-Null
           Write-OK ("DedicatedSegmentSize set at {0} -> {1} MB ({2})" -f $n.Path,$maxDgpuVramMB,$n.Desc)
         } catch {
           Write-Warn2 "Failed at $($n.Path) : $($_.Exception.Message)"
@@ -346,6 +410,7 @@ function Apply-Tweaks {
   # F) Pagefile: force fixed 1–2 GB on system drive (robust, typed)
   Write-Step "Configuring pagefile (fixed 1024–2048 MB on system drive)"
   try {
+    if ($WhatIfPreference) { Write-Info "WhatIf: would configure pagefile (fixed 1024-2048 MB on system drive)" }
     $sysDrive = $env:SystemDrive
     $pfPath   = Join-Path $sysDrive "pagefile.sys"
     $mmKey    = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"
@@ -359,25 +424,35 @@ function Apply-Tweaks {
     # 2) Turn off automatic management
     $cs2 = Get-CimInstance -ClassName Win32_ComputerSystem
     if ($cs2.AutomaticManagedPagefile) {
-      Set-CimInstance -InputObject $cs2 -Property @{ AutomaticManagedPagefile = $false } | Out-Null
+      if ($PSCmdlet.ShouldProcess('Win32_ComputerSystem','Disable AutomaticManagedPagefile')) {
+        Set-CimInstance -InputObject $cs2 -Property @{ AutomaticManagedPagefile = $false } | Out-Null
+      }
     }
 
     # 3) WMI pagefile settings: remove existing, then create typed instance
     $existing = Get-CimInstance -ClassName Win32_PageFileSetting -ErrorAction SilentlyContinue
     if ($existing) {
-      foreach ($e in $existing) { Remove-CimInstance -InputObject $e -ErrorAction SilentlyContinue }
+      foreach ($e in $existing) {
+        if ($PSCmdlet.ShouldProcess($e.Name,'Remove Win32_PageFileSetting')) {
+          Remove-CimInstance -InputObject $e -ErrorAction SilentlyContinue
+        }
+      }
     }
 
-    New-CimInstance -ClassName Win32_PageFileSetting -Property @{
-      Name        = $pfPath
-      InitialSize = [UInt32]1024
-      MaximumSize = [UInt32]2048
-    } | Out-Null
+    if ($PSCmdlet.ShouldProcess($pfPath,'Create Win32_PageFileSetting (1024/2048)')) {
+      New-CimInstance -ClassName Win32_PageFileSetting -Property @{
+        Name        = $pfPath
+        InitialSize = [UInt32]1024
+        MaximumSize = [UInt32]2048
+      } | Out-Null
+    }
 
     # 4) Fallback via WMIC if needed
     $pfCheck = Get-CimInstance -ClassName Win32_PageFileSetting -ErrorAction SilentlyContinue | Where-Object {$_.Name -ieq $pfPath}
     if (-not $pfCheck) {
-      & wmic pagefileset where "name='$($pfPath -replace '\\','\\\\')'" set InitialSize=1024,MaximumSize=2048 | Out-Null
+      if ($PSCmdlet.ShouldProcess($pfPath,'WMIC set pagefileset 1024/2048')) {
+        & wmic pagefileset where "name='$($pfPath -replace '\\','\\\\')'" set InitialSize=1024,MaximumSize=2048 | Out-Null
+      }
     }
 
     Write-OK "Pagefile pinned at $pfPath (1024 → 2048 MB) and auto-management disabled"
@@ -388,7 +463,9 @@ function Apply-Tweaks {
   # G) Disable Memory Compression
   Write-Step "Disabling Memory Compression (MMAgent)"
   try {
-    Disable-MMAgent -mc -ErrorAction SilentlyContinue
+    if ($PSCmdlet.ShouldProcess('MMAgent','Disable Memory Compression')) {
+      Disable-MMAgent -mc -ErrorAction SilentlyContinue
+    }
     $mma = $null; try { $mma = Get-MMAgent } catch {}
     if ($mma) { Write-OK ("MemoryCompression: " + $mma.MemoryCompression) } else { Write-OK "MemoryCompression: False" }
   } catch { Write-Warn2 "Could not change Memory Compression." }
@@ -398,6 +475,8 @@ function Apply-Tweaks {
 
 # ----------------------- Actions: Revert -----------------------------#
 function Revert-Tweaks {
+  [CmdletBinding(SupportsShouldProcess=$true, ConfirmImpact='High')]
+  param()
   Write-Step "Reverting registry changes to defaults/common-safe values"
 
   $mm  = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"
@@ -453,11 +532,17 @@ function Revert-Tweaks {
 
     $cs3 = Get-CimInstance Win32_ComputerSystem
     if (-not $cs3.AutomaticManagedPagefile) {
-      Set-CimInstance -InputObject $cs3 -Property @{ AutomaticManagedPagefile = $true } | Out-Null
+      if ($PSCmdlet.ShouldProcess('Win32_ComputerSystem','Enable AutomaticManagedPagefile')) {
+        Set-CimInstance -InputObject $cs3 -Property @{ AutomaticManagedPagefile = $true } | Out-Null
+      }
     }
 
     Get-CimInstance -ClassName Win32_PageFileSetting -ErrorAction SilentlyContinue |
-      ForEach-Object { Remove-CimInstance -InputObject $_ -ErrorAction SilentlyContinue }
+      ForEach-Object {
+        if ($PSCmdlet.ShouldProcess($_.Name,'Remove Win32_PageFileSetting')) {
+          Remove-CimInstance -InputObject $_ -ErrorAction SilentlyContinue
+        }
+      }
 
     Write-OK "Automatic pagefile restored (reboot recommended)"
   } catch {
@@ -466,7 +551,7 @@ function Revert-Tweaks {
 
   # Re-enable Memory Compression
   Write-Step "Re-enabling Memory Compression"
-  try { Enable-MMAgent -mc | Out-Null } catch {}
+  try { if ($PSCmdlet.ShouldProcess('MMAgent','Enable Memory Compression')) { Enable-MMAgent -mc | Out-Null } } catch {}
   Write-OK "Revert complete. **Reboot recommended**."
 }
 
