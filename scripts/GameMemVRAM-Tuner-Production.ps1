@@ -154,9 +154,9 @@ function Write-Log {
 }
 
 function Write-Step { param([string]$Text) { Write-Log "==> $Text" -Level Info } }
-function Write-Success { param([string]$Text) { Write-Log "✓ $Text" -Level Info } }
+function Write-Success { param([string]$Text) { Write-Log "[OK] $Text" -Level Info } }
 function Write-Warning { param([string]$Text) { Write-Log "! $Text" -Level Warn } }
-function Write-Error { param([string]$Text) { Write-Log "✗ $Text" -Level Error } }
+function Write-Error { param([string]$Text) { Write-Log "[ERROR] $Text" -Level Error } }
 
 # ========================= VALIDATION & SAFETY =========================
 function Test-Prerequisites {
@@ -863,8 +863,8 @@ function Invoke-SystemOptimization {
         Optimize-PageFile -MemoryInfo $memoryInfo
         Optimize-MemoryCompression
         
-        Write-Host "`n✓ System optimization completed successfully!" -ForegroundColor Green
-        Write-Host "⚠️  REBOOT REQUIRED to activate all changes" -ForegroundColor Yellow
+        Write-Host "`n[OK] System optimization completed successfully!" -ForegroundColor Green
+        Write-Host "[WARNING] REBOOT REQUIRED to activate all changes" -ForegroundColor Yellow
         
         if (-not $Force) {
             $reboot = Read-Host "`nReboot now? (y/N)"
@@ -967,7 +967,7 @@ function Invoke-SystemRevert {
     }
     
     Write-Success "System revert completed: $reverted settings restored to defaults"
-    Write-Host "⚠️  REBOOT RECOMMENDED to fully apply reverted settings" -ForegroundColor Yellow
+    Write-Host "[WARNING] REBOOT RECOMMENDED to fully apply reverted settings" -ForegroundColor Yellow
 }
 
 function Show-SystemReport {
