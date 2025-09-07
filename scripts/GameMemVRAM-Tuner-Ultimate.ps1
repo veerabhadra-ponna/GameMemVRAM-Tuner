@@ -2,48 +2,58 @@
 #Requires -RunAsAdministrator
 
 <# =====================================================================
-  GameMemVRAM-Tuner-Production.ps1  (Windows 10/11, PowerShell 5.1+)
+  GameMemVRAM-Tuner-Ultimate.ps1  (Windows 10/11, PowerShell 5.1+)
   
-  A production-grade system optimization tool for gaming performance.
+  Ultimate gaming performance optimization tool combining memory, GPU,
+  ETW cleanup, and system optimizations in a single comprehensive script.
   
   FEATURES:
   - Auto-detects RAM and GPU configuration with robust VRAM detection
-  - RAM-optimized settings with I/O reduction
+  - RAM-optimized settings with I/O reduction and memory management
   - GPU scheduling (HAGS) and Multi-Plane Overlay (MPO) configuration  
   - Fixed pagefile sizing and memory compression management
+  - ETW (Event Tracing for Windows) cleanup and optimization
+  - Service management for telemetry and unnecessary processes
   - Xbox Game DVR and Game Mode optimization
+  - MMCSS gaming task optimizations and timer resolution
   - Optional TCP low-latency networking tweaks
   - Comprehensive logging and audit trail
-  - Registry backup and restore functionality
-  - Configuration file support
+  - Registry backup and restore functionality with rollback
+  - System restore point creation
+  - Configuration file support with multiple profiles
   - System compatibility validation
-  - Detailed error handling and rollback capabilities
+  - Detailed error handling and comprehensive reporting
   
   USAGE (Administrator required):
-    .\GameMemVRAM-Tuner-Production.ps1 -Apply
-    .\GameMemVRAM-Tuner-Production.ps1 -Report  
-    .\GameMemVRAM-Tuner-Production.ps1 -Revert
-    .\GameMemVRAM-Tuner-Production.ps1 -Backup -BackupPath "C:\Backup"
-    .\GameMemVRAM-Tuner-Production.ps1 -Restore -BackupPath "C:\Backup"
+    .\GameMemVRAM-Tuner-Ultimate.ps1 -Apply
+    .\GameMemVRAM-Tuner-Ultimate.ps1 -Report  
+    .\GameMemVRAM-Tuner-Ultimate.ps1 -Revert
+    .\GameMemVRAM-Tuner-Ultimate.ps1 -Backup -BackupPath "C:\Backup"
+    .\GameMemVRAM-Tuner-Ultimate.ps1 -Restore -BackupPath "C:\Backup"
     
   Optional Parameters:
-    -SkipNetwork          Skip TCP networking optimizations
-    -ForceVramMB <int>    Override detected VRAM amount
-    -ConfigFile <path>    Use custom configuration file
-    -LogLevel <level>     Set logging level (Error|Warn|Info|Debug)
-    -WhatIf              Preview changes without applying them
-    -Force               Skip confirmation prompts
+    -SkipNetwork              Skip TCP networking optimizations
+    -SkipETW                  Skip ETW session cleanup
+    -SkipServices             Skip service optimization
+    -ForceVramMB <int>        Override detected VRAM amount
+    -ConfigFile <path>        Use custom configuration file
+    -LogLevel <level>         Set logging level (Error|Warn|Info|Debug)
+    -WhatIf                   Preview changes without applying them
+    -Force                    Skip confirmation prompts
+    -CreateRestorePoint       Create system restore point before changes
     
   EXAMPLES:
     # Apply with custom VRAM and skip networking
-    .\GameMemVRAM-Tuner-Production.ps1 -Apply -ForceVramMB 8192 -SkipNetwork
+    .\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -ForceVramMB 8192 -SkipNetwork
     
-    # Create backup before applying changes
-    .\GameMemVRAM-Tuner-Production.ps1 -Backup -BackupPath "C:\MyBackup"
-    .\GameMemVRAM-Tuner-Production.ps1 -Apply
+    # Create system restore point and backup before applying changes
+    .\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -CreateRestorePoint -BackupPath "C:\MyBackup"
     
     # Preview changes without applying
-    .\GameMemVRAM-Tuner-Production.ps1 -Apply -WhatIf
+    .\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -WhatIf
+    
+    # Skip ETW and service optimizations
+    .\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -SkipETW -SkipServices
     
 ===================================================================== #>
 
@@ -66,6 +76,12 @@ param(
     
     [Parameter()]
     [switch]$SkipNetwork,
+    
+    [Parameter()]
+    [switch]$SkipETW,
+    
+    [Parameter()]
+    [switch]$SkipServices,
     
     [Parameter()]
     [ValidateRange(1024, 131072)]
@@ -97,16 +113,21 @@ param(
     [switch]$WhatIf,
     
     [Parameter()]
-    [switch]$Force
+    [switch]$Force,
+    
+    [Parameter()]
+    [switch]$CreateRestorePoint
 )
 
 # ========================= GLOBAL CONFIGURATION =========================
 $Script:Config = @{
-    LogPath = Join-Path $env:TEMP "GameMemVRAM-Tuner-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
-    BackupFileName = "GameMemVRAM-Registry-Backup-$(Get-Date -Format 'yyyyMMdd-HHmmss').json"
+    LogPath = Join-Path $env:TEMP "GameMemVRAM-Tuner-Ultimate-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+    BackupFileName = "GameMemVRAM-Ultimate-Backup-$(Get-Date -Format 'yyyyMMdd-HHmmss').json"
     RequiredWindowsVersion = [Version]"10.0.0.0"
     MaxLogSizeMB = 50
     TimeoutSeconds = 30
+    ScriptVersion = "3.0"
+    ScriptName = "GameMemVRAM-Tuner-Ultimate"
 }
 
 # ========================= LOGGING SYSTEM =========================
@@ -187,6 +208,14 @@ function Test-Prerequisites {
         Write-Warning "Low disk space on $tempDrive drive. Logging may be affected."
     }
     
+    # Check for gaming-related processes
+    $gamingProcesses = Get-Process | Where-Object { 
+        $_.ProcessName -match "(steam|origin|epic|battle|xbox|discord)" 
+    }
+    if ($gamingProcesses) {
+        Write-Warning "Gaming applications detected running. Consider closing them before optimization."
+    }
+    
     Write-Success "Prerequisites validated"
 }
 
@@ -221,13 +250,35 @@ function Test-SystemStability {
     }
 }
 
-# ========================= BACKUP & RESTORE SYSTEM =========================
+# ========================= SYSTEM RESTORE POINT =========================
+function New-SystemRestorePoint {
+    if (-not $CreateRestorePoint) { return }
+    
+    Write-Log "Creating system restore point..." -Level Info -Category "RestorePoint"
+    try {
+        # Enable system restore if disabled
+        Enable-ComputerRestore -Drive "$env:SystemDrive"
+        
+        # Create restore point
+        Checkpoint-Computer -Description "GameMemVRAM-Tuner-Ultimate - Before Optimization" -RestorePointType "MODIFY_SETTINGS"
+        Write-Success "System restore point created successfully"
+    }
+    catch {
+        Write-Warning "Failed to create restore point: $($_.Exception.Message)"
+    }
+}
+
+# ========================= COMPREHENSIVE BACKUP & RESTORE SYSTEM =========================
 $Script:BackupData = @{
     Timestamp = Get-Date
     ComputerName = $env:COMPUTERNAME
     UserName = $env:USERNAME
+    ScriptVersion = $Script:Config.ScriptVersion
     RegistryValues = @{}
     SystemInfo = @{}
+    AutoLoggers = @{}
+    Services = @{}
+    ActiveETWSessions = @()
 }
 
 function Backup-RegistryValue {
@@ -269,7 +320,7 @@ function Export-SystemBackup {
         [string]$BackupPath
     )
     
-    Write-Step "Creating system backup"
+    Write-Step "Creating comprehensive system backup"
     
     # Collect system information
     $Script:BackupData.SystemInfo = @{
@@ -277,25 +328,76 @@ function Export-SystemBackup {
         PSVersion = $PSVersionTable.PSVersion.ToString()
         TotalRAM_GB = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
         GPUs = @(Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM, PNPDeviceID)
-        InstalledSoftware = @(Get-CimInstance Win32_Product | Select-Object Name, Version, Vendor)
     }
     
-    # Backup all registry values we'll modify
+    # Backup registry values from both original scripts
     $registryKeys = @(
+        # Memory Management (from GameMemVRAM-Tuner-Production)
         @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management"; Values = @("DisablePagingExecutive", "LargeSystemCache", "ClearPageFileAtShutdown", "IoPageLockLimit", "NonPagedPoolQuota", "PagedPoolQuota", "SystemPages", "PagingFiles", "ExistingPageFiles", "TempPageFile") },
         @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem"; Values = @("NtfsMemoryUsage") },
         @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters"; Values = @("EnablePrefetcher", "EnableSuperfetch") },
+        
+        # Graphics (from GameMemVRAM-Tuner-Production)
         @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers"; Values = @("HwSchMode") },
         @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows\Dwm"; Values = @("OverlayTestMode") },
+        
+        # Gaming (from both scripts - combined)
         @{ Path = "HKCU:\Software\Microsoft\GameBar"; Values = @("AllowAutoGameMode") },
         @{ Path = "HKCU:\System\GameConfigStore"; Values = @("GameDVR_Enabled", "GameDVR_FSEBehaviorMode", "GameDVR_HonorUserFSEBehaviorMode", "GameDVR_DXGIHonorFSEWindowsCompatible", "GameDVR_EFSEFeatureFlags", "GameDVR_FSEBehavior", "GameDVR_HonorFSEWindowsCompatible") },
-        @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"; Values = @("TcpNoDelay", "TcpAckFrequency", "TcpDelAckTicks") }
+        
+        # Network (from GameMemVRAM-Tuner-Production)
+        @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"; Values = @("TcpNoDelay", "TcpAckFrequency", "TcpDelAckTicks") },
+        
+        # MMCSS and Gaming Task Optimizations (from Gaming_Performance_Optimizer)
+        @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile"; Values = @("SystemResponsiveness", "NetworkThrottlingIndex") },
+        @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games"; Values = @("GPU Priority", "Priority", "Scheduling Category", "SFIO Priority") },
+        
+        # Performance Settings (from Gaming_Performance_Optimizer)
+        @{ Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; Values = @("AllowTelemetry", "DoNotShowFeedbackNotifications") },
+        @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; Values = @("AllowTelemetry") },
+        @{ Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\AppCompat"; Values = @("AITEnable", "DisableInventory") },
+        @{ Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo"; Values = @("DisabledByGroupPolicy") },
+        @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\Power"; Values = @("HibernateEnabled") },
+        @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\kernel"; Values = @("GlobalTimerResolutionRequests") }
     )
     
     foreach ($keyInfo in $registryKeys) {
         foreach ($valueName in $keyInfo.Values) {
             Backup-RegistryValue -Path $keyInfo.Path -Name $valueName -Description "System optimization setting"
         }
+    }
+    
+    # Backup ETW Auto Loggers
+    $autoLoggerPath = "HKLM:\SYSTEM\CurrentControlSet\Control\WMI\Autologger"
+    if (Test-Path $autoLoggerPath) {
+        Get-ChildItem $autoLoggerPath | ForEach-Object {
+            $startValue = Get-ItemProperty $_.PSPath -Name "Start" -ErrorAction SilentlyContinue
+            if ($startValue) {
+                $Script:BackupData.AutoLoggers[$_.PSChildName] = $startValue.Start
+            }
+        }
+    }
+    
+    # Backup Services
+    $servicesToCheck = @("DiagTrack", "dmwappushservice", "DPS", "WerSvc", "RetailDemo", "PcaSvc", "SysMain")
+    foreach ($svcName in $servicesToCheck) {
+        $service = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+        if ($service) {
+            $Script:BackupData.Services[$svcName] = @{
+                Status = $service.Status.ToString()
+                StartType = $service.StartType.ToString()
+            }
+        }
+    }
+    
+    # Backup Active ETW Sessions
+    try {
+        $etwOutput = logman query ets 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $Script:BackupData.ActiveETWSessions = $etwOutput | Where-Object { $_ -notmatch "^(Data Collector Set|Name|The command completed successfully)" -and $_ -ne "" }
+        }
+    } catch {
+        Write-Log "Could not backup ETW sessions: $($_.Exception.Message)" -Level Debug -Category "Backup"
     }
     
     # Export to JSON file
@@ -322,6 +424,7 @@ function Import-SystemBackup {
         $restored = 0
         $failed = 0
         
+        # Restore registry values
         foreach ($key in $backupData.RegistryValues.PSObject.Properties.Name) {
             $regValue = $backupData.RegistryValues.$key
             
@@ -335,6 +438,33 @@ function Import-SystemBackup {
             } catch {
                 Write-Warning "Failed to restore $($regValue.Path)\$($regValue.Name): $($_.Exception.Message)"
                 $failed++
+            }
+        }
+        
+        # Restore auto loggers
+        if ($backupData.AutoLoggers) {
+            foreach ($logger in $backupData.AutoLoggers.PSObject.Properties) {
+                $path = "HKLM:\SYSTEM\CurrentControlSet\Control\WMI\Autologger\$($logger.Name)"
+                if (Test-Path $path -and -not $WhatIf) {
+                    Set-ItemProperty -Path $path -Name "Start" -Value $logger.Value -Type DWord
+                    Write-Log "Restored auto logger: $($logger.Name)" -Level Debug -Category "Restore"
+                    $restored++
+                }
+            }
+        }
+        
+        # Restore services
+        if ($backupData.Services) {
+            foreach ($service in $backupData.Services.PSObject.Properties) {
+                $svcData = $service.Value
+                if (-not $WhatIf) {
+                    Set-Service -Name $service.Name -StartupType $svcData.StartType -ErrorAction SilentlyContinue
+                    if ($svcData.Status -eq "Running") {
+                        Start-Service -Name $service.Name -ErrorAction SilentlyContinue
+                    }
+                }
+                Write-Log "Restored service: $($service.Name)" -Level Debug -Category "Restore"
+                $restored++
             }
         }
         
@@ -621,6 +751,218 @@ function Get-RegistryVRAMBytes {
     return 0
 }
 
+# ========================= ETW SESSION MANAGEMENT =========================
+function Get-ActiveETWSessions {
+    if ($SkipETW) { return @() }
+    
+    try {
+        $sessions = @()
+        $output = logman query ets 2>&1
+        
+        if ($LASTEXITCODE -eq 0) {
+            $output | ForEach-Object {
+                if ($_ -match "^[a-zA-Z]" -and $_ -notmatch "^(Data Collector Set|Name|The command completed successfully)") {
+                    $sessionName = ($_ -split "\s+")[0]
+                    if ($sessionName -and $sessionName.Length -gt 0) {
+                        $sessions += $sessionName
+                    }
+                }
+            }
+        }
+        
+        return $sessions
+    }
+    catch {
+        Write-Log "Failed to get ETW sessions: $($_.Exception.Message)" -Level Error -Category "ETW"
+        return @()
+    }
+}
+
+function Stop-ETWSessionSafe {
+    param(
+        [string]$SessionName,
+        [int]$MaxRetries = 3
+    )
+    
+    if ($SkipETW) { return $true }
+    
+    for ($i = 1; $i -le $MaxRetries; $i++) {
+        try {
+            $result = logman stop $SessionName -ets 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Log "✓ Stopped ETW session: $SessionName" -Level Info -Category "ETW"
+                return $true
+            }
+            elseif ($result -match "not found") {
+                Write-Log "- Session not found: $SessionName" -Level Debug -Category "ETW"
+                return $true
+            }
+            else {
+                Write-Log "Attempt $i failed for session $SessionName : $result" -Level Warn -Category "ETW"
+                Start-Sleep -Seconds 2
+            }
+        }
+        catch {
+            Write-Log "Exception stopping session $SessionName (attempt $i): $($_.Exception.Message)" -Level Warn -Category "ETW"
+            Start-Sleep -Seconds 2
+        }
+    }
+    
+    Write-Log "✗ Failed to stop session after $MaxRetries attempts: $SessionName" -Level Error -Category "ETW"
+    return $false
+}
+
+function Optimize-ETWSettings {
+    if ($SkipETW) {
+        Write-Log "Skipping ETW optimizations (user requested)" -Level Info -Category "ETW"
+        return
+    }
+    
+    Write-Step "Optimizing ETW (Event Tracing for Windows) settings"
+    
+    # Show current ETW sessions
+    $activeSessions = Get-ActiveETWSessions
+    Write-Log "Found $($activeSessions.Count) active ETW sessions" -Level Info -Category "ETW"
+    $activeSessions | ForEach-Object { Write-Log "  - $_" -Level Debug -Category "ETW" }
+    
+    # Disable ETW Auto Loggers
+    $autoLoggersToDisable = @(
+        "DiagTrack-Listener",
+        "LwtNetLog", 
+        "WiFiSession",
+        "WdiContextLog",
+        "Circular Kernel Context Logger",
+        "CloudExperienceHostOobe",
+        "DiagLog",
+        "ReadyBoot",
+        "SetupPlatform",
+        "UBPM",
+        "WFP-IPsec Trace",
+        "Microsoft-Windows-Rdp-Graphics-RdpIdd-Trace",
+        "NetCore",
+        "NtfsLog",
+        "RadioManager",
+        "WinPhoneCritical"
+    )
+    
+    $autoLoggerPath = "HKLM:\SYSTEM\CurrentControlSet\Control\WMI\Autologger"
+    $disabledCount = 0
+    
+    foreach ($logger in $autoLoggersToDisable) {
+        $fullPath = "$autoLoggerPath\$logger"
+        if (Test-Path $fullPath) {
+            try {
+                $currentValue = Get-ItemProperty -Path $fullPath -Name "Start" -ErrorAction SilentlyContinue
+                if ($currentValue -and $currentValue.Start -ne 0) {
+                    if (-not $WhatIf) {
+                        Set-ItemProperty -Path $fullPath -Name "Start" -Value 0 -Type DWord
+                    }
+                    Write-Log "✓ Disabled auto logger: $logger" -Level Info -Category "ETW"
+                    $disabledCount++
+                }
+                else {
+                    Write-Log "- Already disabled: $logger" -Level Debug -Category "ETW"
+                }
+            }
+            catch {
+                Write-Log "✗ Failed to disable: $logger - $($_.Exception.Message)" -Level Error -Category "ETW"
+            }
+        }
+    }
+    
+    # Stop Active ETW Sessions
+    $sessionsToStop = @(
+        "DiagLog",
+        "DiagTrack-Listener", 
+        "LwtNetLog",
+        "WiFiSession",
+        "WdiContextLog",
+        "Circular Kernel Context Logger",
+        "ReadyBoot",
+        "SetupPlatform",
+        "UBPM",
+        "CloudExperienceHostOobe",
+        "WFP-IPsec Trace",
+        "Microsoft-Windows-Rdp-Graphics-RdpIdd-Trace",
+        "NetCore"
+    )
+    
+    $stoppedCount = 0
+    foreach ($session in $sessionsToStop) {
+        if (Stop-ETWSessionSafe -SessionName $session) {
+            $stoppedCount++
+        }
+    }
+    
+    Write-Success "ETW optimization: $disabledCount auto loggers disabled, $stoppedCount sessions processed"
+}
+
+# ========================= SERVICE MANAGEMENT =========================
+function Set-ServiceStateSafe {
+    param(
+        [string]$ServiceName,
+        [string]$DisplayName,
+        [string]$StartupType,
+        [string]$Action = "Stop"
+    )
+    
+    if ($SkipServices) { return $true }
+    
+    try {
+        $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        if (-not $service) {
+            Write-Log "- Service not found: $DisplayName" -Level Debug -Category "Service"
+            return $true
+        }
+        
+        # Stop service if needed
+        if ($Action -eq "Stop" -and $service.Status -eq "Running" -and -not $WhatIf) {
+            Stop-Service -Name $ServiceName -Force -ErrorAction Stop
+            Write-Log "Stopped service: $DisplayName" -Level Info -Category "Service"
+        }
+        
+        # Set startup type
+        if (-not $WhatIf) {
+            Set-Service -Name $ServiceName -StartupType $StartupType -ErrorAction Stop
+        }
+        Write-Log "✓ Set $DisplayName startup type to: $StartupType" -Level Info -Category "Service"
+        
+        return $true
+    }
+    catch {
+        Write-Log "✗ Failed to configure service $DisplayName : $($_.Exception.Message)" -Level Error -Category "Service"
+        return $false
+    }
+}
+
+function Optimize-ServiceSettings {
+    if ($SkipServices) {
+        Write-Log "Skipping service optimizations (user requested)" -Level Info -Category "Service"
+        return
+    }
+    
+    Write-Step "Optimizing system services for gaming performance"
+    
+    $servicesToConfigure = @(
+        @{Name="DiagTrack"; DisplayName="Connected User Experiences and Telemetry"; StartupType="Disabled"},
+        @{Name="dmwappushservice"; DisplayName="Device Management Wireless Application Protocol"; StartupType="Disabled"},
+        @{Name="DPS"; DisplayName="Diagnostic Policy Service"; StartupType="Manual"},
+        @{Name="WerSvc"; DisplayName="Windows Error Reporting Service"; StartupType="Manual"},
+        @{Name="RetailDemo"; DisplayName="Retail Demo Service"; StartupType="Disabled"},
+        @{Name="PcaSvc"; DisplayName="Program Compatibility Assistant Service"; StartupType="Manual"},
+        @{Name="SysMain"; DisplayName="Superfetch"; StartupType="Manual"}
+    )
+    
+    $configuredCount = 0
+    foreach ($svc in $servicesToConfigure) {
+        if (Set-ServiceStateSafe -ServiceName $svc.Name -DisplayName $svc.DisplayName -StartupType $svc.StartupType) {
+            $configuredCount++
+        }
+    }
+    
+    Write-Success "Service optimization: $configuredCount/$($servicesToConfigure.Count) services configured"
+}
+
 # ========================= OPTIMIZATION FUNCTIONS =========================
 function Optimize-MemoryManagement {
     param([object]$MemoryInfo)
@@ -738,6 +1080,99 @@ function Optimize-GameSettings {
     Write-Success "Game settings optimized: $applied/$($settings.Count) settings applied"
 }
 
+function Optimize-MMCSSSettings {
+    Write-Step "Optimizing MMCSS (Multimedia Class Scheduler Service) settings"
+    
+    try {
+        # MMCSS optimizations
+        $mmcssPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile"
+        $gamesPath = "$mmcssPath\Tasks\Games"
+        
+        $settings = @(
+            @{ Path = $mmcssPath; Name = "SystemResponsiveness"; Value = 0; Type = "DWord"; Description = "Optimize system responsiveness for games" },
+            @{ Path = $mmcssPath; Name = "NetworkThrottlingIndex"; Value = [uint32]0xffffffff; Type = "DWord"; Description = "Disable network throttling" }
+        )
+        
+        # Ensure Games task registry path exists
+        if (-not (Test-Path $gamesPath) -and -not $WhatIf) {
+            New-Item -Path $gamesPath -Force | Out-Null
+        }
+        
+        $gameSettings = @(
+            @{ Path = $gamesPath; Name = "GPU Priority"; Value = 8; Type = "DWord"; Description = "Set GPU priority for games" },
+            @{ Path = $gamesPath; Name = "Priority"; Value = 6; Type = "DWord"; Description = "Set thread priority for games" },
+            @{ Path = $gamesPath; Name = "Scheduling Category"; Value = "High"; Type = "String"; Description = "Set scheduling category for games" },
+            @{ Path = $gamesPath; Name = "SFIO Priority"; Value = "High"; Type = "String"; Description = "Set storage I/O priority for games" }
+        )
+        
+        $applied = 0
+        foreach ($setting in ($settings + $gameSettings)) {
+            if (Set-RegistryValue -Path $setting.Path -Name $setting.Name -Value $setting.Value -Type $setting.Type -Description $setting.Description) {
+                $applied++
+            }
+        }
+        
+        Write-Success "MMCSS settings optimized: $applied/$($settings.Count + $gameSettings.Count) settings applied"
+        
+    } catch {
+        Write-Error "MMCSS optimization failed: $($_.Exception.Message)"
+    }
+}
+
+function Optimize-PerformanceSettings {
+    Write-Step "Applying additional performance optimizations"
+    
+    try {
+        $performanceSettings = @{
+            "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" = @{
+                "AllowTelemetry" = 0
+                "DoNotShowFeedbackNotifications" = 1
+            }
+            "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" = @{
+                "AllowTelemetry" = 0
+            }
+            "HKLM:\SOFTWARE\Policies\Microsoft\Windows\AppCompat" = @{
+                "AITEnable" = 0
+                "DisableInventory" = 1
+            }
+            "HKLM:\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo" = @{
+                "DisabledByGroupPolicy" = 1
+            }
+            "HKLM:\SYSTEM\CurrentControlSet\Control\Power" = @{
+                "HibernateEnabled" = 0
+            }
+        }
+        
+        $applied = 0
+        foreach ($regPath in $performanceSettings.Keys) {
+            try {
+                if (-not (Test-Path $regPath) -and -not $WhatIf) {
+                    New-Item -Path $regPath -Force | Out-Null
+                }
+                foreach ($setting in $performanceSettings[$regPath].Keys) {
+                    if (Set-RegistryValue -Path $regPath -Name $setting -Value $performanceSettings[$regPath][$setting] -Type "DWord" -Description "Performance optimization setting") {
+                        $applied++
+                    }
+                }
+            }
+            catch {
+                Write-Log "Failed to apply settings to: $regPath - $($_.Exception.Message)" -Level Error
+            }
+        }
+        
+        # Timer Resolution Optimization
+        $timerPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\kernel"
+        if (Set-RegistryValue -Path $timerPath -Name "GlobalTimerResolutionRequests" -Value 1 -Type "DWord" -Description "Enable high resolution timers") {
+            $applied++
+        }
+        
+        Write-Success "Performance settings optimized: $applied settings applied"
+        
+    } catch {
+        Write-Error "Performance optimization failed: $($_.Exception.Message)"
+    }
+}
+
 function Optimize-NetworkSettings {
     if ($SkipNetwork) {
         Write-Log "Skipping network optimizations (user requested)" -Level Info
@@ -844,7 +1279,7 @@ function Optimize-MemoryCompression {
 
 # ========================= MAIN OPERATIONS =========================
 function Invoke-SystemOptimization {
-    Write-Step "Starting system optimization for gaming performance"
+    Write-Step "Starting comprehensive system optimization for ultimate gaming performance"
     
     # System detection
     $memoryInfo = Get-SystemMemoryInfo
@@ -854,20 +1289,34 @@ function Invoke-SystemOptimization {
         throw "Failed to detect system memory configuration"
     }
     
-    # Apply optimizations
+    # Apply optimizations in logical order
     try {
+        # Core system optimizations
         Optimize-MemoryManagement -MemoryInfo $memoryInfo
         Optimize-GraphicsSettings -GPUList $gpuList  
         Optimize-GameSettings
-        Optimize-NetworkSettings
         Optimize-PageFile -MemoryInfo $memoryInfo
         Optimize-MemoryCompression
         
-        Write-Host "`n[OK] System optimization completed successfully!" -ForegroundColor Green
-        Write-Host "[WARNING] REBOOT REQUIRED to activate all changes" -ForegroundColor Yellow
+        # Gaming-specific optimizations
+        Optimize-MMCSSSettings
+        Optimize-PerformanceSettings
+        
+        # System cleanup and maintenance
+        Optimize-ETWSettings
+        Optimize-ServiceSettings
+        
+        # Network optimizations (optional)
+        Optimize-NetworkSettings
+        
+        Write-Host "`n" + ("="*70) -ForegroundColor Green
+        Write-Host "[SUCCESS] Ultimate gaming optimization completed successfully!" -ForegroundColor Green
+        Write-Host ("="*70) -ForegroundColor Green
+        Write-Host "[WARNING] SYSTEM RESTART REQUIRED to activate all changes" -ForegroundColor Yellow
+        Write-Host ("="*70) -ForegroundColor Green
         
         if (-not $Force) {
-            $reboot = Read-Host "`nReboot now? (y/N)"
+            $reboot = Read-Host "`nRestart system now to apply all changes? (y/N)"
             if ($reboot -match '^y(es)?$') {
                 Write-Log "User initiated system reboot" -Level Info
                 Restart-Computer -Confirm:$false -Force
@@ -881,7 +1330,7 @@ function Invoke-SystemOptimization {
 }
 
 function Invoke-SystemRevert {
-    Write-Step "Reverting system optimizations to defaults"
+    Write-Step "Reverting all gaming optimizations to Windows defaults"
     
     # Define default values for all settings
     $revertSettings = @(
@@ -918,7 +1367,19 @@ function Invoke-SystemRevert {
         # Network
         @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"; Name = "TcpNoDelay"; Value = 0; Type = "DWord" },
         @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"; Name = "TcpAckFrequency"; Value = 0; Type = "DWord" },
-        @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"; Name = "TcpDelAckTicks"; Value = 2; Type = "DWord" }
+        @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"; Name = "TcpDelAckTicks"; Value = 2; Type = "DWord" },
+        
+        # MMCSS
+        @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile"; Name = "SystemResponsiveness"; Value = 20; Type = "DWord" },
+        @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile"; Name = "NetworkThrottlingIndex"; Value = 10; Type = "DWord" },
+        
+        # Performance Settings
+        @{ Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection"; Name = "AllowTelemetry"; Value = 1; Type = "DWord" },
+        @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection"; Name = "AllowTelemetry"; Value = 1; Type = "DWord" },
+        @{ Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\AppCompat"; Name = "AITEnable"; Value = 1; Type = "DWord" },
+        @{ Path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo"; Name = "DisabledByGroupPolicy"; Value = 0; Type = "DWord" },
+        @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\Power"; Name = "HibernateEnabled"; Value = 1; Type = "DWord" },
+        @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\kernel"; Name = "GlobalTimerResolutionRequests"; Value = 0; Type = "DWord" }
     )
     
     $reverted = 0
@@ -933,6 +1394,13 @@ function Invoke-SystemRevert {
     $displayNodes = Get-DisplayRegistryNodes
     foreach ($node in $displayNodes) {
         Remove-RegistryValue -Path $node.Path -Name "DedicatedSegmentSize"
+    }
+    
+    # Remove gaming task optimization
+    $gamesPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games"
+    $gameTaskSettings = @("GPU Priority", "Priority", "Scheduling Category", "SFIO Priority")
+    foreach ($setting in $gameTaskSettings) {
+        Remove-RegistryValue -Path $gamesPath -Name $setting
     }
     
     # Restore automatic pagefile management
@@ -966,20 +1434,69 @@ function Invoke-SystemRevert {
         Write-Warning "Failed to re-enable memory compression: $($_.Exception.Message)"
     }
     
+    # Restore services to default state
+    Write-Log "Restoring services to default state" -Level Info
+    $serviceRestores = @(
+        @{Name="DiagTrack"; StartupType="Automatic"},
+        @{Name="dmwappushservice"; StartupType="Manual"},
+        @{Name="DPS"; StartupType="Automatic"},
+        @{Name="WerSvc"; StartupType="Manual"},
+        @{Name="PcaSvc"; StartupType="Automatic"},
+        @{Name="SysMain"; StartupType="Automatic"}
+    )
+    
+    foreach ($svc in $serviceRestores) {
+        try {
+            if (-not $WhatIf) {
+                Set-Service -Name $svc.Name -StartupType $svc.StartupType -ErrorAction SilentlyContinue
+            }
+            Write-Log "Restored service: $($svc.Name) to $($svc.StartupType)" -Level Debug
+        } catch {
+            Write-Log "Failed to restore service: $($svc.Name)" -Level Warn
+        }
+    }
+    
+    # Re-enable ETW Auto Loggers
+    Write-Log "Re-enabling ETW auto loggers" -Level Info
+    $autoLoggerPath = "HKLM:\SYSTEM\CurrentControlSet\Control\WMI\Autologger"
+    $autoLoggersToRestore = @(
+        "DiagTrack-Listener",
+        "LwtNetLog", 
+        "WiFiSession",
+        "WdiContextLog",
+        "CloudExperienceHostOobe",
+        "DiagLog",
+        "ReadyBoot",
+        "SetupPlatform"
+    )
+    
+    foreach ($logger in $autoLoggersToRestore) {
+        $fullPath = "$autoLoggerPath\$logger"
+        if (Test-Path $fullPath -and -not $WhatIf) {
+            try {
+                Set-ItemProperty -Path $fullPath -Name "Start" -Value 1 -Type DWord
+                Write-Log "Re-enabled auto logger: $logger" -Level Debug
+            } catch {
+                Write-Log "Failed to re-enable auto logger: $logger" -Level Debug
+            }
+        }
+    }
+    
     Write-Success "System revert completed: $reverted settings restored to defaults"
-    Write-Host "[WARNING] REBOOT RECOMMENDED to fully apply reverted settings" -ForegroundColor Yellow
+    Write-Host "[WARNING] SYSTEM RESTART RECOMMENDED to fully apply reverted settings" -ForegroundColor Yellow
 }
 
 function Show-SystemReport {
-    Write-Step "Generating comprehensive system report"
+    Write-Step "Generating comprehensive ultimate gaming system report"
     
     # System Information
     $memoryInfo = Get-SystemMemoryInfo
     $gpuList = Get-GPUInformation
+    $activeSessions = Get-ActiveETWSessions
     
-    Write-Host "`n" + ("="*60) -ForegroundColor Cyan
-    Write-Host "SYSTEM CONFIGURATION REPORT" -ForegroundColor Cyan  
-    Write-Host ("="*60) -ForegroundColor Cyan
+    Write-Host "`n" + ("="*80) -ForegroundColor Cyan
+    Write-Host "GAMEMEMVRAM-TUNER-ULTIMATE SYSTEM REPORT" -ForegroundColor Cyan  
+    Write-Host ("="*80) -ForegroundColor Cyan
     
     # Basic System Info
     Write-Host "`nSYSTEM INFORMATION:" -ForegroundColor Yellow
@@ -987,6 +1504,7 @@ function Show-SystemReport {
     Write-Host "  User: $env:USERNAME"
     Write-Host "  OS Version: $([Environment]::OSVersion.Version)"
     Write-Host "  PowerShell: $($PSVersionTable.PSVersion)"
+    Write-Host "  Script Version: $($Script:Config.ScriptVersion)"
     if ($memoryInfo) {
         Write-Host "  Total RAM: $($memoryInfo.TotalGB) GB"
         Write-Host "  Memory Modules: $($memoryInfo.Modules.Count)"
@@ -1003,6 +1521,31 @@ function Show-SystemReport {
         }
     }
     
+    # ETW Session Information
+    if (-not $SkipETW) {
+        Write-Host "`nETW SESSIONS:" -ForegroundColor Yellow
+        Write-Host "  Active Sessions: $($activeSessions.Count)"
+        if ($activeSessions.Count -gt 0) {
+            $activeSessions | Select-Object -First 10 | ForEach-Object { Write-Host "  - $_" }
+            if ($activeSessions.Count -gt 10) {
+                Write-Host "  ... and $($activeSessions.Count - 10) more sessions"
+            }
+        }
+    }
+    
+    # Service Status
+    if (-not $SkipServices) {
+        Write-Host "`nSERVICE STATUS:" -ForegroundColor Yellow
+        $targetServices = @("DiagTrack", "dmwappushservice", "SysMain", "PcaSvc")
+        foreach ($svcName in $targetServices) {
+            $service = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+            if ($service) {
+                $status = "$($service.Status) ($($service.StartType))"
+                Write-Host "  $($service.DisplayName): $status"
+            }
+        }
+    }
+    
     # Current Registry Settings
     Write-Host "`nCURRENT OPTIMIZATION SETTINGS:" -ForegroundColor Yellow
     
@@ -1015,16 +1558,42 @@ function Show-SystemReport {
         @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters"; Name = "EnableSuperfetch"; Description = "Superfetch" },
         @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\GraphicsDrivers"; Name = "HwSchMode"; Description = "Hardware GPU Scheduling" },
         @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows\Dwm"; Name = "OverlayTestMode"; Description = "Multi-Plane Overlay" },
-        @{ Path = "HKCU:\System\GameConfigStore"; Name = "GameDVR_Enabled"; Description = "Xbox Game DVR" }
+        @{ Path = "HKCU:\System\GameConfigStore"; Name = "GameDVR_Enabled"; Description = "Xbox Game DVR" },
+        @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile"; Name = "SystemResponsiveness"; Description = "MMCSS System Responsiveness" },
+        @{ Path = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile"; Name = "NetworkThrottlingIndex"; Description = "Network Throttling" },
+        @{ Path = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\kernel"; Name = "GlobalTimerResolutionRequests"; Description = "High Resolution Timers" }
     )
     
     foreach ($check in $registryChecks) {
         try {
             $value = (Get-ItemProperty -Path $check.Path -Name $check.Name -ErrorAction SilentlyContinue).($check.Name)
-            $displayValue = if ($null -eq $value) { "Not Set" } else { $value }
-            Write-Host ("  {0}: {1}" -f $check.Description.PadRight(30), $displayValue)
+            $displayValue = if ($null -eq $value) { "Not Set" } else { 
+                if ($check.Name -eq "NetworkThrottlingIndex" -and $value -eq [uint32]0xffffffff) { "Disabled" } 
+                else { $value } 
+            }
+            Write-Host ("  {0}: {1}" -f $check.Description.PadRight(35), $displayValue)
         } catch {
-            Write-Host ("  {0}: Error reading value" -f $check.Description.PadRight(30))
+            Write-Host ("  {0}: Error reading value" -f $check.Description.PadRight(35))
+        }
+    }
+    
+    # Gaming Task Settings
+    Write-Host "`nGAMING TASK OPTIMIZATIONS:" -ForegroundColor Yellow
+    $gamesPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games"
+    $gameTaskSettings = @(
+        @{Name="GPU Priority"; Description="GPU Priority"},
+        @{Name="Priority"; Description="Thread Priority"},
+        @{Name="Scheduling Category"; Description="Scheduling Category"},
+        @{Name="SFIO Priority"; Description="Storage I/O Priority"}
+    )
+    
+    foreach ($setting in $gameTaskSettings) {
+        try {
+            $value = (Get-ItemProperty -Path $gamesPath -Name $setting.Name -ErrorAction SilentlyContinue).($setting.Name)
+            $displayValue = if ($null -eq $value) { "Not Set" } else { $value }
+            Write-Host ("  {0}: {1}" -f $setting.Description.PadRight(25), $displayValue)
+        } catch {
+            Write-Host ("  {0}: Not Set" -f $setting.Description.PadRight(25))
         }
     }
     
@@ -1076,70 +1645,41 @@ function Show-SystemReport {
         Write-Host "  No custom VRAM hints set"
     }
     
-    Write-Host "`n" + ("="*60) -ForegroundColor Cyan
+    # Performance Status Summary
+    Write-Host "`nOPTIMIZATION STATUS SUMMARY:" -ForegroundColor Green
+    $optimizationCount = 0
+    $totalChecks = $registryChecks.Count
+    
+    foreach ($check in $registryChecks) {
+        try {
+            $value = (Get-ItemProperty -Path $check.Path -Name $check.Name -ErrorAction SilentlyContinue).($check.Name)
+            if ($null -ne $value -and $value -ne 0) {
+                $optimizationCount++
+            }
+        } catch {}
+    }
+    
+    $optimizationPercentage = [math]::Round(($optimizationCount / $totalChecks) * 100)
+    Write-Host "  Optimization Level: $optimizationPercentage% ($optimizationCount/$totalChecks settings optimized)"
+    
+    if ($optimizationPercentage -ge 80) {
+        Write-Host "  Status: ✓ FULLY OPTIMIZED" -ForegroundColor Green
+    } elseif ($optimizationPercentage -ge 50) {
+        Write-Host "  Status: ⚠ PARTIALLY OPTIMIZED" -ForegroundColor Yellow  
+    } else {
+        Write-Host "  Status: ✗ NOT OPTIMIZED" -ForegroundColor Red
+    }
+    
+    Write-Host "`n" + ("="*80) -ForegroundColor Cyan
     Write-Host "Report generated: $(Get-Date)" -ForegroundColor Gray
-}
-
-# ========================= CONFIGURATION FILE SUPPORT =========================
-function Get-ConfigurationSettings {
-    param([string]$ConfigFile)
-    
-    if (-not $ConfigFile -or -not (Test-Path $ConfigFile)) {
-        return $null
-    }
-    
-    try {
-        $config = Get-Content $ConfigFile -Raw | ConvertFrom-Json
-        Write-Success "Configuration loaded from: $ConfigFile"
-        return $config
-    } catch {
-        Write-Warning "Failed to load configuration file: $($_.Exception.Message)"
-        return $null
-    }
-}
-
-function New-DefaultConfiguration {
-    return @{
-        Version = "1.0"
-        Description = "GameMemVRAM-Tuner Configuration"
-        Settings = @{
-            Memory = @{
-                DisablePagingExecutive = $true
-                LargeSystemCache = $true
-                IoPageLockLimitFactor = 2
-                EnablePrefetcher = $true
-                EnableSuperfetch = $false
-            }
-            Graphics = @{
-                HardwareScheduling = $true
-                DisableMultiPlaneOverlay = $true
-                ApplyVRAMHints = $true
-            }
-            Gaming = @{
-                EnableGameMode = $true
-                DisableGameDVR = $true
-            }
-            Network = @{
-                EnableLowLatency = $true
-                TcpNoDelay = $true
-            }
-            Pagefile = @{
-                UseCustomSize = $true
-                MinSizeMB = 1024
-                MaxSizeMB = 2048
-            }
-            MemoryCompression = @{
-                Enabled = $false
-            }
-        }
-    } | ConvertTo-Json -Depth 10
+    Write-Host "Log file: $($Script:Config.LogPath)" -ForegroundColor Gray
 }
 
 # ========================= MAIN EXECUTION =========================
 function Main {
     try {
         # Initialize logging
-        Write-Log "GameMemVRAM-Tuner-Production starting" -Level Info -Category "System"
+        Write-Log "GameMemVRAM-Tuner-Ultimate v$($Script:Config.ScriptVersion) starting" -Level Info -Category "System"
         Write-Log "Parameters: Apply=$Apply, Revert=$Revert, Report=$Report, Backup=$Backup, Restore=$Restore" -Level Debug -Category "System"
         
         # Validate prerequisites
@@ -1149,7 +1689,12 @@ function Main {
         # Load configuration if specified
         $config = $null
         if ($ConfigFile) {
-            $config = Get-ConfigurationSettings -ConfigFile $ConfigFile
+            try {
+                $config = Get-Content $ConfigFile -Raw | ConvertFrom-Json
+                Write-Success "Configuration loaded from: $ConfigFile"
+            } catch {
+                Write-Warning "Failed to load configuration file: $($_.Exception.Message)"
+            }
         }
         
         # Determine operation
@@ -1165,18 +1710,31 @@ function Main {
         # Execute requested operation
         switch ($operation) {
             "Apply" {
+                # Create system restore point if requested
+                New-SystemRestorePoint
+                
+                # Create backup if path provided
                 if ($BackupPath) {
                     Export-SystemBackup -BackupPath $BackupPath
                 }
+                
+                # Apply optimizations
                 Invoke-SystemOptimization
+                
+                # Show final report
                 Show-SystemReport
             }
             
             "Revert" {
+                # Create backup before reverting if path provided
                 if ($BackupPath) {
                     Export-SystemBackup -BackupPath $BackupPath
                 }
+                
+                # Revert changes
                 Invoke-SystemRevert  
+                
+                # Show report
                 Show-SystemReport
             }
             
@@ -1195,7 +1753,7 @@ function Main {
                 if (-not $BackupPath) {
                     throw "BackupPath parameter is required for restore operation"
                 }
-                $backupFiles = Get-ChildItem -Path $BackupPath -Filter "GameMemVRAM-Registry-Backup-*.json" | Sort-Object LastWriteTime -Descending
+                $backupFiles = Get-ChildItem -Path $BackupPath -Filter "GameMemVRAM-Ultimate-Backup-*.json" | Sort-Object LastWriteTime -Descending
                 if (-not $backupFiles) {
                     throw "No backup files found in: $BackupPath"
                 }
@@ -1203,10 +1761,13 @@ function Main {
                 $latestBackup = $backupFiles[0].FullName
                 Write-Log "Using latest backup: $latestBackup" -Level Info
                 Import-SystemBackup -BackupFile $latestBackup
+                
+                # Show report after restore
+                Show-SystemReport
             }
         }
         
-        Write-Log "GameMemVRAM-Tuner-Production completed successfully" -Level Info -Category "System"
+        Write-Log "GameMemVRAM-Tuner-Ultimate completed successfully" -Level Info -Category "System"
         
     } catch {
         Write-Error "Script execution failed: $($_.Exception.Message)"

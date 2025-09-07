@@ -1,6 +1,6 @@
-# GameMemVRAM-Tuner v2.0 Production Edition
+# GameMemVRAM-Tuner-Ultimate v3.0
 
-🚀 **A comprehensive, production-grade system optimization tool designed to enhance gaming performance on Windows 10/11 through intelligent memory management, GPU optimization, and advanced system tuning.**
+🚀 **The ultimate gaming performance optimization tool combining memory management, GPU optimization, ETW cleanup, and system tuning in a single comprehensive script for Windows 10/11.**
 
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue)](https://docs.microsoft.com/powershell/)
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-green)](https://www.microsoft.com/windows/)
@@ -16,6 +16,10 @@
 - **📄 Smart Pagefile**: Dynamic pagefile sizing based on RAM configuration (1-2GB fixed)
 - **🎯 Game Mode Enhancement**: Complete Xbox Game DVR disabling and Game Mode optimization
 - **🌐 Network Latency**: Optional TCP low-latency tweaks for competitive gaming
+- **⚡ ETW Cleanup**: Advanced Event Tracing for Windows session cleanup and optimization
+- **🛠️ Service Optimization**: Intelligent system service management for gaming performance
+- **🎵 MMCSS Tuning**: Multimedia Class Scheduler Service optimization for games
+- **⏱️ Timer Resolution**: High-resolution timer optimization for reduced input latency
 
 ### 🛡️ Production-Grade Features
 - **📋 Comprehensive Logging**: Multi-level logging (Error/Warn/Info/Debug) with file rotation
@@ -24,15 +28,21 @@
 - **✅ System Validation**: Pre-flight compatibility, stability, and safety checks
 - **🔧 Robust Error Handling**: Transaction-like operations with automatic rollback
 - **📊 Performance Monitoring**: Real-time system metrics and performance tracking
-- **⏰ Scheduled Operations**: Automatic optimization on boot via Windows Task Scheduler
+- **🛡️ System Restore Points**: Built-in Windows restore point creation before changes
 - **🖥️ Enterprise Ready**: Silent deployment, configuration management, audit trails
+- **⚠️ Skip Options**: Granular control to skip ETW, services, or network optimizations
 
-### 🆕 Version 2.0 Enhancements
+### 🆕 Version 3.0 Ultimate Features
+- **🔗 Unified Script**: Single comprehensive script combining all optimization features
+- **⚡ ETW Management**: Advanced Event Tracing for Windows cleanup and optimization
+- **🛠️ Service Control**: Intelligent telemetry and system service management
+- **🎵 MMCSS Optimization**: Gaming task priority and multimedia scheduler tuning
+- **⏱️ Timer Precision**: High-resolution timer optimization for competitive gaming
 - **🎯 WhatIf Mode**: Preview all changes before applying them
-- **🔄 Installer Script**: One-click installation with shortcuts and scheduled tasks
 - **📈 Enhanced Detection**: Multi-method hardware detection with fallbacks
 - **🛡️ Safety First**: Comprehensive validation and stability assessment
 - **📱 User Experience**: Colored console output, progress indicators, detailed reports
+- **⚠️ Selective Options**: Skip ETW, services, or network optimizations as needed
 
 ## 📋 System Requirements
 
@@ -56,40 +66,42 @@
 
 ## 🚀 Quick Start Guide
 
-### 🎯 Option 1: Full Installation (Recommended)
+### 🎯 Option 1: Ultimate Optimization (Recommended)
 ```powershell
 # 1. Run as Administrator
-# 2. Install with all features
-.\Install-GameMemVRAMTuner.ps1 -CreateScheduledTask -CreateShortcuts -EnableMonitoring
+# 2. Apply all optimizations with system restore point
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -CreateRestorePoint
 
-# 3. Apply optimizations
-.\GameMemVRAM-Tuner-Production.ps1 -Apply
-
-# 4. Reboot to activate all changes
+# 3. Reboot to activate all changes
 Restart-Computer
 ```
 
-### ⚡ Option 2: Quick Test (Safe)
+### ⚡ Option 2: Safe Preview & Apply
 ```powershell
 # Preview changes without applying them
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -WhatIf
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -WhatIf
 
 # Create backup and apply if satisfied
-.\GameMemVRAM-Tuner-Production.ps1 -Backup -BackupPath "C:\GMVT-Backup"
-.\GameMemVRAM-Tuner-Production.ps1 -Apply
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Backup -BackupPath "C:\GMVT-Backup"
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply
 ```
 
-### 🔧 Option 3: Manual Control
+### 🔧 Option 3: Selective Optimization
 ```powershell
+# Skip specific optimizations as needed
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -SkipETW           # Skip ETW cleanup
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -SkipServices     # Skip service optimization
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -SkipNetwork      # Skip network tweaks
+
 # Step-by-step process
-.\GameMemVRAM-Tuner-Production.ps1 -Report          # Check current state
-.\GameMemVRAM-Tuner-Production.ps1 -Backup -BackupPath "D:\Backup"  # Create backup
-.\GameMemVRAM-Tuner-Production.ps1 -Apply           # Apply optimizations
-.\GameMemVRAM-Tuner-Production.ps1 -Report          # Verify changes
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Report          # Check current state
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Backup -BackupPath "D:\Backup"  # Create backup
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply           # Apply optimizations
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Report          # Verify changes
 
 # If issues occur:
-.\GameMemVRAM-Tuner-Production.ps1 -Revert          # OR
-.\GameMemVRAM-Tuner-Production.ps1 -Restore -BackupPath "D:\Backup"
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Revert          # OR
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Restore -BackupPath "D:\Backup"
 ```
 
 ## 📖 Comprehensive Usage Examples
@@ -98,90 +110,95 @@ Restart-Computer
 
 #### High-End Gaming Setup (RTX 4070+ / RX 7700 XT+)
 ```powershell
-# Maximum performance configuration
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -ConfigFile ".\config\gaming-config.json" -LogLevel Info
+# Maximum performance configuration with all optimizations
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -CreateRestorePoint -LogLevel Info
 ```
 
 #### Competitive Gaming (Low Latency Focus)
 ```powershell
-# Apply with network optimizations for competitive play
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -LogLevel Debug
-# Network tweaks included by default
+# Apply with all optimizations including ETW cleanup and timer resolution
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -LogLevel Debug
+# Network tweaks, ETW cleanup, and timer optimization included by default
 ```
 
 #### Budget Gaming System
 ```powershell
-# Conservative approach for older/budget systems
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -ConfigFile ".\config\conservative-config.json"
+# Conservative approach - skip ETW and service optimizations for stability
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -SkipETW -SkipServices -SkipNetwork
 ```
 
 ### 🔧 Advanced Operations
 ```powershell
 # Preview all changes before applying (highly recommended)
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -WhatIf
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -WhatIf
 
 # Apply with custom VRAM amount (if auto-detection fails)
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -ForceVramMB 12288  # 12GB
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -ForceVramMB 12288  # 12GB
 
-# Skip network optimizations (for server/workstation use)
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -SkipNetwork
+# Skip specific optimizations
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -SkipNetwork      # Skip network tweaks
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -SkipETW          # Skip ETW cleanup
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -SkipServices     # Skip service optimization
+
+# Create system restore point before changes
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -CreateRestorePoint
 
 # Silent operation (for scripts/automation)
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -Force -LogLevel Error
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -Force -LogLevel Error
 ```
 
 ### 💾 Backup & Recovery Operations
 ```powershell
 # Create comprehensive system backup
-.\GameMemVRAM-Tuner-Production.ps1 -Backup -BackupPath "D:\GMVT-Backups"
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Backup -BackupPath "D:\GMVT-Backups"
 
 # List available backups
-Get-ChildItem "D:\GMVT-Backups\GameMemVRAM-Registry-Backup-*.json" | Sort-Object LastWriteTime
+Get-ChildItem "D:\GMVT-Backups\GameMemVRAM-Ultimate-Backup-*.json" | Sort-Object LastWriteTime
 
 # Restore from specific backup
-.\GameMemVRAM-Tuner-Production.ps1 -Restore -BackupPath "D:\GMVT-Backups"
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Restore -BackupPath "D:\GMVT-Backups"
 
 # Quick revert to system defaults
-.\GameMemVRAM-Tuner-Production.ps1 -Revert
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Revert
 ```
 
-### ⚙️ Configuration Management
+### ⚙️ Selective Optimization Control
 ```powershell
-# Use predefined gaming profile
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -ConfigFile ".\config\gaming-profile.json"
+# Gaming profile (all optimizations enabled)
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply
 
-# Use balanced profile (stability + performance)
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -ConfigFile ".\config\balanced-profile.json"
+# Balanced profile (skip aggressive optimizations)
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -SkipETW
 
-# Create custom configuration
-Copy-Item ".\config\default-config.json" ".\config\my-config.json"
-# Edit my-config.json, then:
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -ConfigFile ".\config\my-config.json"
+# Conservative profile (memory and GPU only)
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -SkipETW -SkipServices -SkipNetwork
+
+# Custom configuration with config file
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -ConfigFile ".\config\my-config.json"
 ```
 
 ### 📊 Monitoring & Analysis
 ```powershell
-# Generate detailed system report
-.\GameMemVRAM-Tuner-Production.ps1 -Report | Out-File "system-report.txt"
+# Generate comprehensive system report
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Report | Out-File "system-report.txt"
 
-# Monitor performance metrics (if monitoring enabled)
-$logPath = "C:\Program Files\GameMemVRAM-Tuner\Logs\performance.log"
-Get-Content $logPath -Wait  # Real-time monitoring
+# View current optimization status
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Report
 
-# View optimization history
-Get-Content "C:\Program Files\GameMemVRAM-Tuner\Logs\*.log" | Where-Object { $_ -match "SUCCESS|ERROR" }
+# Check log files for issues
+Get-Content "$env:TEMP\GameMemVRAM-Tuner-Ultimate-*.log" | Where-Object { $_ -match "ERROR|WARN" }
 ```
 
 ### 🏢 Enterprise & Automation
 ```powershell
-# Silent deployment for multiple systems
-.\Install-GameMemVRAMTuner.ps1 -Force -CreateScheduledTask -InstallPath "C:\Tools\GMVT"
+# Silent deployment optimization
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -Force -LogLevel Error
 
-# Automated optimization (for login scripts)
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -Force -LogLevel Error -ConfigFile ".\config\enterprise.json"
+# Automated optimization with backup (for login scripts)
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -Force -BackupPath "C:\IT\GMVT-Backups"
 
 # Validate deployment
-.\GameMemVRAM-Tuner-Production.ps1 -Report | Select-String "ERROR|WARN"
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Report | Select-String "ERROR|WARN"
 ```
 
 ## ⚙️ Configuration System
@@ -279,6 +296,43 @@ TcpAckFrequency = 1     # Immediate ACK responses
 TcpDelAckTicks = 0      # No delayed ACK timer
 ```
 **Result:** 2-5ms reduction in network latency for competitive gaming
+
+### ⚡ ETW (Event Tracing for Windows) Cleanup
+
+```powershell
+# ETW sessions stopped and disabled:
+DiagTrack-Listener      # Diagnostic tracking
+LwtNetLog              # Network logging
+WiFiSession            # WiFi diagnostics
+WdiContextLog          # Windows Diagnostic Infrastructure
+ReadyBoot              # Boot optimization logging
+# ... and 10+ more sessions
+```
+**Result:** Reduced system overhead, improved gaming performance
+
+### 🛠️ Service Optimization
+
+```powershell
+# Services optimized:
+DiagTrack              # Disabled (Telemetry)
+dmwappushservice       # Disabled (Push notifications)
+DPS                    # Manual (Diagnostic Policy)
+SysMain                # Manual (Superfetch)
+PcaSvc                 # Manual (Compatibility Assistant)
+```
+**Result:** Lower background CPU usage, more resources for games
+
+### 🎵 MMCSS Gaming Optimizations
+
+```powershell
+# Gaming task optimizations:
+SystemResponsiveness = 0       # Prioritize foreground apps
+NetworkThrottlingIndex = 0xffffffff  # Disable network throttling
+GPU Priority = 8               # Maximum GPU priority for games
+Priority = 6                   # High thread priority
+Scheduling Category = "High"    # High scheduling priority
+```
+**Result:** Improved game performance and reduced input latency
 
 ### 💾 Storage & Pagefile Management
 
@@ -470,7 +524,7 @@ Ping Improvements:
 # If you get execution policy errors:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 # OR run with bypass:
-PowerShell -ExecutionPolicy Bypass -File ".\GameMemVRAM-Tuner-Production.ps1" -Apply
+PowerShell -ExecutionPolicy Bypass -File ".\GameMemVRAM-Tuner-Ultimate.ps1" -Apply
 ```
 
 #### Insufficient Privileges
@@ -482,33 +536,35 @@ PowerShell -ExecutionPolicy Bypass -File ".\GameMemVRAM-Tuner-Production.ps1" -A
 
 #### System Instability After Optimization
 ```powershell
-# Restore from backup
-.\GameMemVRAM-Tuner-Production.ps1 -Restore -BackupPath "C:\Program Files\GameMemVRAM-Tuner\Backup"
+# Use Windows System Restore (if restore point was created)
+rstrui.exe  # Launch System Restore GUI
+
+# OR restore from backup
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Restore -BackupPath "C:\Backup"
 
 # OR use the revert function
-.\GameMemVRAM-Tuner-Production.ps1 -Revert
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Revert
 ```
 
 #### VRAM Detection Issues
 ```powershell
 # Force specific VRAM amount
-.\GameMemVRAM-Tuner-Production.ps1 -Apply -ForceVramMB 8192
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Apply -ForceVramMB 8192
 
 # Check detection logs
-.\GameMemVRAM-Tuner-Production.ps1 -Report
+.\GameMemVRAM-Tuner-Ultimate.ps1 -Report
 ```
 
 ### Log Analysis
 Log files are stored in:
-- Installation: `C:\Program Files\GameMemVRAM-Tuner\Logs\`
-- Temporary: `%TEMP%\GameMemVRAM-Tuner-*.log`
+- Temporary: `%TEMP%\GameMemVRAM-Tuner-Ultimate-*.log`
 
 ```powershell
 # View recent logs
-Get-Content "C:\Program Files\GameMemVRAM-Tuner\Logs\*.log" | Select-Object -Last 50
+Get-Content "$env:TEMP\GameMemVRAM-Tuner-Ultimate-*.log" | Select-Object -Last 50
 
 # Filter error messages
-Get-Content "*.log" | Where-Object { $_ -match "ERROR|WARN" }
+Get-Content "$env:TEMP\GameMemVRAM-Tuner-Ultimate-*.log" | Where-Object { $_ -match "ERROR|WARN" }
 ```
 
 ## 🔧 Advanced Features
@@ -583,7 +639,7 @@ Get-Content "*.log" | Where-Object { $_ -match "ERROR|WARN" }
 
 ## 🎮 Final Words
 
-**GameMemVRAM-Tuner v2.0** represents the evolution from a simple registry tweaking script to a comprehensive, production-grade system optimization platform. Built by the gaming community for the gaming community, it embodies the principle of "maximum performance with maximum safety."
+**GameMemVRAM-Tuner-Ultimate v3.0** represents the ultimate evolution - a single comprehensive script that combines memory management, GPU optimization, ETW cleanup, and system service tuning. Built by the gaming community for the gaming community, it embodies the principle of "maximum performance with maximum safety."
 
  Whether you're a competitive esports player seeking every last frame, a content creator balancing gaming and streaming, or an IT professional optimizing gaming workstations, this tool provides the reliability, safety, and performance you demand.
 

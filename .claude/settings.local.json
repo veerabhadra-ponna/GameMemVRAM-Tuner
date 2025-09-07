@@ -2,7 +2,25 @@
   "permissions": {
     "allow": [
       "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Bash(powershell:*)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Read(/D:\\work\\GameMemVRAM-Tuner\\scripts/**)",
+      "Bash(git commit:*)",
+      "Bash(Remove-Item \"D:\\work\\GameMemVRAM-Tuner\\scripts\\Install-GameMemVRAMTuner.ps1\" -Force)"
     ],
     "deny": [],
     "ask": []
