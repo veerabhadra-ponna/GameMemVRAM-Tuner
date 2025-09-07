@@ -1,0 +1,43 @@
+{
+    "Version": "1.0",
+    "Name": "Gaming Profile",
+    "Description": "Maximum performance configuration for competitive gaming",
+    "Author": "GameMemVRAM-Tuner Ultimate",
+    "Created": "2024-01-01",
+    "OptimizationSettings": {
+        "Memory": true,
+        "GPU": true,
+        "ETW": true,
+        "Gaming": true,
+        "Network": true,
+        "MousePrecision": true,
+        "PowerPlan": true,
+        "VisualEffects": true,
+        "BackgroundApps": true
+    },
+    "AdvancedSettings": {
+        "Memory": {
+            "CustomPagefileSizeMB": 2048,
+            "IoPageLockLimitMultiplier": 2,
+            "DisableMemoryCompression": true
+        },
+        "GPU": {
+            "EnableHAGS": true,
+            "DisableMPO": true,
+            "VRAMBudgetingEnabled": true
+        },
+        "Network": {
+            "TcpNoDelay": true,
+            "TcpAckFrequency": 1,
+            "DisableNetworkThrottling": true
+        },
+        "Gaming": {
+            "DisableGameDVR": true,
+            "OptimizeGameMode": true,
+            "OptimizeFullscreenExclusive": true
+        }
+    },
+    "EstimatedPerformanceGain": "+15-25% FPS improvement",
+    "RebootRequired": true,
+    "CompatibilityNotes": "Optimized for high-end gaming systems with 16GB+ RAM and discrete GPU"
+}

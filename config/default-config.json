@@ -1,0 +1,92 @@
+{
+  "Version": "1.0",
+  "Description": "GameMemVRAM-Tuner Default Configuration",
+  "LastModified": "2024-09-04",
+  "Settings": {
+    "Memory": {
+      "DisablePagingExecutive": true,
+      "LargeSystemCache": true,
+      "IoPageLockLimitFactor": 2,
+      "IoPageLockLimitMinMB": 64,
+      "IoPageLockLimitMaxMB": 256,
+      "EnablePrefetcher": true,
+      "EnableSuperfetch": false,
+      "ClearPageFileAtShutdown": false,
+      "UnlimitedPoolQuotas": true
+    },
+    "Graphics": {
+      "HardwareScheduling": true,
+      "DisableMultiPlaneOverlay": true,
+      "ApplyVRAMHints": true,
+      "VRAMHintPercentage": 100,
+      "EnableGameMode": true
+    },
+    "Gaming": {
+      "EnableAutoGameMode": true,
+      "DisableGameDVR": true,
+      "OptimizeFSE": true,
+      "EnableCompatibilityMode": true
+    },
+    "Network": {
+      "EnableLowLatency": true,
+      "TcpNoDelay": true,
+      "TcpAckFrequency": 1,
+      "TcpDelAckTicks": 0,
+      "ApplyNetworkOptimizations": true
+    },
+    "Pagefile": {
+      "UseCustomSize": true,
+      "AutoCalculateSize": true,
+      "MinSizeMB": 1024,
+      "MaxSizeMB": 2048,
+      "SizeFactorGB": 1.5,
+      "MaxSizeFactorGB": 2.0
+    },
+    "MemoryCompression": {
+      "Enabled": false,
+      "Reason": "Disabled for gaming performance"
+    },
+    "Advanced": {
+      "CreateBackupBeforeChanges": true,
+      "ValidateBeforeApply": true,
+      "SkipRebootPrompt": false,
+      "EnableDebugLogging": false,
+      "MaxLogFiles": 10,
+      "MaxLogSizeMB": 50
+    }
+  },
+  "Profiles": {
+    "Gaming": {
+      "Description": "Optimized for gaming performance",
+      "Memory.LargeSystemCache": true,
+      "Graphics.HardwareScheduling": true,
+      "Gaming.DisableGameDVR": true,
+      "Network.EnableLowLatency": true,
+      "MemoryCompression.Enabled": false
+    },
+    "Balanced": {
+      "Description": "Balanced performance and compatibility",
+      "Memory.LargeSystemCache": false,
+      "Graphics.HardwareScheduling": true,
+      "Gaming.DisableGameDVR": false,
+      "Network.EnableLowLatency": false,
+      "MemoryCompression.Enabled": true
+    },
+    "Conservative": {
+      "Description": "Minimal changes for stability",
+      "Memory.LargeSystemCache": false,
+      "Graphics.HardwareScheduling": false,
+      "Gaming.DisableGameDVR": false,
+      "Network.EnableLowLatency": false,
+      "MemoryCompression.Enabled": true
+    }
+  },
+  "Compatibility": {
+    "MinWindowsVersion": "10.0.0.0",
+    "MaxWindowsVersion": "11.99.99.99",
+    "SupportedArchitectures": ["x64", "ARM64"],
+    "RequiredFeatures": ["PowerShell5.1", "Administrator"],
+    "ConflictingServices": ["SysMain", "Themes"],
+    "RequiredServices": ["EventLog", "RpcSs"]
+  }
+}

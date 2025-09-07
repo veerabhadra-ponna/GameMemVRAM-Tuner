@@ -1,0 +1,43 @@
+{
+    "Version": "1.0",
+    "Name": "Conservative Profile",
+    "Description": "Minimal optimizations for older or sensitive systems",
+    "Author": "GameMemVRAM-Tuner Ultimate",
+    "Created": "2024-01-01",
+    "OptimizationSettings": {
+        "Memory": false,
+        "GPU": true,
+        "ETW": false,
+        "Gaming": true,
+        "Network": false,
+        "MousePrecision": true,
+        "PowerPlan": false,
+        "VisualEffects": false,
+        "BackgroundApps": false
+    },
+    "AdvancedSettings": {
+        "Memory": {
+            "CustomPagefileSizeMB": 0,
+            "IoPageLockLimitMultiplier": 1,
+            "DisableMemoryCompression": false
+        },
+        "GPU": {
+            "EnableHAGS": true,
+            "DisableMPO": false,
+            "VRAMBudgetingEnabled": false
+        },
+        "Network": {
+            "TcpNoDelay": false,
+            "TcpAckFrequency": 2,
+            "DisableNetworkThrottling": false
+        },
+        "Gaming": {
+            "DisableGameDVR": true,
+            "OptimizeGameMode": true,
+            "OptimizeFullscreenExclusive": false
+        }
+    },
+    "EstimatedPerformanceGain": "+3-8% FPS improvement",
+    "RebootRequired": false,
+    "CompatibilityNotes": "Safe for older systems, budget hardware, and corporate environments"
+}

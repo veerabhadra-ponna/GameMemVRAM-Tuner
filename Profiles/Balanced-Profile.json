@@ -1,0 +1,43 @@
+{
+    "Version": "1.0",
+    "Name": "Balanced Profile",
+    "Description": "Balanced performance and stability for general gaming and productivity",
+    "Author": "GameMemVRAM-Tuner Ultimate",
+    "Created": "2024-01-01",
+    "OptimizationSettings": {
+        "Memory": true,
+        "GPU": true,
+        "ETW": true,
+        "Gaming": true,
+        "Network": false,
+        "MousePrecision": true,
+        "PowerPlan": false,
+        "VisualEffects": false,
+        "BackgroundApps": false
+    },
+    "AdvancedSettings": {
+        "Memory": {
+            "CustomPagefileSizeMB": 1536,
+            "IoPageLockLimitMultiplier": 1.5,
+            "DisableMemoryCompression": false
+        },
+        "GPU": {
+            "EnableHAGS": true,
+            "DisableMPO": false,
+            "VRAMBudgetingEnabled": true
+        },
+        "Network": {
+            "TcpNoDelay": false,
+            "TcpAckFrequency": 2,
+            "DisableNetworkThrottling": false
+        },
+        "Gaming": {
+            "DisableGameDVR": true,
+            "OptimizeGameMode": true,
+            "OptimizeFullscreenExclusive": false
+        }
+    },
+    "EstimatedPerformanceGain": "+8-15% FPS improvement",
+    "RebootRequired": true,
+    "CompatibilityNotes": "Suitable for most gaming systems, maintains Windows functionality"
+}
